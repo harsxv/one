@@ -13,15 +13,20 @@
  * See the License for the specific language governing permissions and       *
  * limitations under the License.                                            *
  * ------------------------------------------------------------------------- */
-import { useMemo, ReactElement } from 'react'
+import { ReactElement, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useViews } from 'client/features/Auth'
 import { useGetDatastoresQuery } from 'client/features/OneApi/datastore'
 
-import EnhancedTable, { createColumns } from 'client/components/Tables/Enhanced'
 import DatastoreColumns from 'client/components/Tables/Datastores/columns'
 import DatastoreRow from 'client/components/Tables/Datastores/row'
+import EnhancedTable, { createColumns } from 'client/components/Tables/Enhanced'
+import {
+  areArraysEqual,
+  sortStateTables,
+} from 'client/components/Tables/Enhanced/Utils/DataTableUtils'
 import { RESOURCE_NAMES } from 'client/constants'
+import { useFormContext } from 'react-hook-form'
 
 const DEFAULT_DATA_CY = 'datastores'
 
@@ -30,12 +35,69 @@ const DEFAULT_DATA_CY = 'datastores'
  * @returns {ReactElement} Datastores table
  */
 const DatastoresTable = (props) => {
-  const { rootProps = {}, searchProps = {}, ...rest } = props ?? {}
+  const {
+    rootProps = {},
+    searchProps = {},
+    useQuery = useGetDatastoresQuery,
+    vdcDatastores,
+    zoneId,
+    dependOf,
+    filter,
+    reSelectRows,
+    value,
+    ...rest
+  } = props ?? {}
   rootProps['data-cy'] ??= DEFAULT_DATA_CY
   searchProps['data-cy'] ??= `search-${DEFAULT_DATA_CY}`
 
   const { view, getResourceView } = useViews()
-  const { data = [], isFetching, refetch } = useGetDatastoresQuery()
+
+  let values
+
+  if (typeof filter === 'function') {
+    const { watch } = useFormContext()
+
+    const getDataForDepend = useCallback(
+      (n) => {
+        let dependName = n
+        // removes character '$'
+        if (n.startsWith('$')) dependName = n.slice(1)
+
+        return watch(dependName)
+      },
+      [dependOf]
+    )
+
+    const valuesOfDependField = () => {
+      if (!dependOf) return null
+
+      return Array.isArray(dependOf)
+        ? dependOf.map(getDataForDepend)
+        : getDataForDepend(dependOf)
+    }
+    values = valuesOfDependField()
+  }
+
+  const {
+    data = [],
+    isFetching,
+    refetch,
+  } = useQuery(
+    { zone: zoneId },
+    {
+      selectFromResult: (result) => {
+        const rtn = { ...result }
+        if (vdcDatastores) {
+          const dataRequest = result.data ?? []
+          rtn.data = dataRequest.filter((ds) => vdcDatastores.includes(ds?.ID))
+        } else if (typeof filter === 'function') {
+          rtn.data = filter(result.data ?? [], values ?? [])
+        }
+
+        return rtn
+      },
+    }
+  )
 
   const columns = useMemo(
     () =>
@@ -45,6 +107,33 @@ const DatastoresTable = (props) => {
       }),
     [view]
   )
+
+  const [stateData, setStateData] = useState(data)
+
+  const updateSelectedRows = () => {
+    if (Array.isArray(values) && typeof reSelectRows === 'function') {
+      const datastores = data
+        .filter((dataObject) => value.includes(dataObject.ID))
+        .map((dataObject) => dataObject.ID)
+
+      const sortedDatastores = sortStateTables(datastores)
+      const sortedValue = sortStateTables(value)
+      if (!areArraysEqual(sortedValue, sortedDatastores)) {
+        reSelectRows(sortedDatastores)
+        setStateData(data)
+      }
+    }
+  }
+
+  useEffect(() => {
+    updateSelectedRows()
+  }, [dependOf])
+
+  useEffect(() => {
+    if (JSON.stringify(data) !== JSON.stringify(stateData)) {
+      updateSelectedRows()
+    }
+  })
 
   return (
     <EnhancedTable
@@ -56,6 +145,7 @@ const DatastoresTable = (props) => {
       isLoading={isFetching}
       getRowId={(row) => String(row.ID)}
       RowComponent={DatastoreRow}
+      dataDepend={values}
       {...rest}
     />
   )

@@ -23,6 +23,7 @@
 #include "VirtualMachineManager.h"
 #include "ImageManager.h"
 #include "Quotas.h"
+#include "BackupJobPool.h"
 #include "ClusterPool.h"
 #include "HostPool.h"
 #include "ImagePool.h"
@@ -1960,7 +1961,6 @@ void LifeCycleManager::trigger_disk_snapshot_success(int vid)
                     break;
 
                 case VirtualMachine::DISK_SNAPSHOT_REVERT_POWEROFF:
-                case VirtualMachine::DISK_SNAPSHOT_REVERT_SUSPENDED:
                     vm->log("LCM", Log::INFO, "VM disk snapshot operation completed.");
                     vm->revert_disk_snapshot(disk_id, snap_id, true);
                     break;
@@ -2045,7 +2045,6 @@ void LifeCycleManager::trigger_disk_snapshot_success(int vid)
                 break;
 
             case VirtualMachine::DISK_SNAPSHOT_SUSPENDED:
-            case VirtualMachine::DISK_SNAPSHOT_REVERT_SUSPENDED:
             case VirtualMachine::DISK_SNAPSHOT_DELETE_SUSPENDED:
                 dm->trigger_suspend_success(vid);
                 break;
@@ -2116,7 +2115,6 @@ void LifeCycleManager::trigger_disk_snapshot_failure(int vid)
                 case VirtualMachine::DISK_SNAPSHOT_DELETE_POWEROFF:
                 case VirtualMachine::DISK_SNAPSHOT_REVERT_POWEROFF:
                 case VirtualMachine::DISK_SNAPSHOT_DELETE_SUSPENDED:
-                case VirtualMachine::DISK_SNAPSHOT_REVERT_SUSPENDED:
                     vm->log("LCM", Log::ERROR, "VM disk snapshot operation failed.");
                     break;
 
@@ -2190,7 +2188,6 @@ void LifeCycleManager::trigger_disk_snapshot_failure(int vid)
                 break;
 
             case VirtualMachine::DISK_SNAPSHOT_SUSPENDED:
-            case VirtualMachine::DISK_SNAPSHOT_REVERT_SUSPENDED:
             case VirtualMachine::DISK_SNAPSHOT_DELETE_SUSPENDED:
                 dm->trigger_suspend_success(vid);
                 break;
@@ -2768,6 +2765,7 @@ void LifeCycleManager::trigger_backup_success(int vid)
         auto& backups = vm->backups();
 
         int ds_id = backups.last_datastore_id();
+        int bj_id = backups.backup_job_id();
 
         int incremental_id = backups.incremental_backup_id();
         int keep_last      = backups.keep_last();
@@ -2958,6 +2956,16 @@ void LifeCycleManager::trigger_backup_success(int vid)
 
         Quotas::ds_del(vm_uid, vm_gid, &ds_deltas);
 
+        /* ------------------------------------------------------------------ */
+        /* Remove VM from Backup Job pending list                             */
+        /* ------------------------------------------------------------------ */
+        if (auto bj = bjpool->get(bj_id))
+        {
+            bj->backup_finished(vid, true);
+
+            bjpool->update(bj.get());
+        }
+
         return;
 
         error_increment_update:
@@ -2984,7 +2992,7 @@ void LifeCycleManager::trigger_backup_success(int vid)
 void LifeCycleManager::trigger_backup_failure(int vid)
 {
     trigger([this, vid] {
-        int vm_uid{0}, vm_gid{0};
+        int vm_uid{0}, vm_gid{0}, bj_id{-1};
         Template ds_deltas;
 
         if ( auto vm = vmpool->get(vid) )
@@ -3008,8 +3016,10 @@ void LifeCycleManager::trigger_backup_failure(int vid)
             vm_uid = vm->get_uid();
             vm_gid = vm->get_gid();
 
-            int incremental_id = vm->backups().incremental_backup_id();
-            Backups::Mode mode = vm->backups().mode();
+            auto& backups = vm->backups();
+            int incremental_id = backups.incremental_backup_id();
+            Backups::Mode mode = backups.mode();
+            bj_id = backups.backup_job_id();
 
             vm->backup_size(ds_deltas);
             ds_deltas.add("DATASTORE", vm->backups().last_datastore_id());
@@ -3019,13 +3029,23 @@ void LifeCycleManager::trigger_backup_failure(int vid)
                 ds_deltas.add("IMAGES", 1);
             }
 
-            vm->backups().last_backup_clear();
+            backups.last_backup_clear();
 
             vmpool->update(vm.get());
         }
 
         // Quota rollback
         Quotas::ds_del(vm_uid, vm_gid, &ds_deltas);
+
+        /* Remove VM from Backup Job pending list                             */
+        /* ------------------------------------------------------------------ */
+        if (auto bj = bjpool->get(bj_id))
+        {
+            bj->backup_finished(vid, false);
+
+            // todo Add failure to BJ?
+            bjpool->update(bj.get());
+        }
     });
 }
 

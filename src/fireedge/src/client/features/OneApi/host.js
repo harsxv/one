@@ -38,14 +38,16 @@ const hostApi = oneApi.injectEndpoints({
       /**
        * Retrieves information for all the hosts in the pool.
        *
+       * @param {object} params - Request params
+       * @param {string} [params.zone] - Zone from where to get the resources
        * @returns {Host[]} Get list of hosts
        * @throws Fails when response isn't code 200
        */
-      query: () => {
+      query: (params) => {
         const name = Actions.HOST_POOL_INFO
         const command = { name, ...Commands[name] }
 
-        return { command }
+        return { command, params }
       },
       transformResponse: (data) => [data?.HOST_POOL?.HOST ?? []].flat(),
       providesTags: (hosts) =>
@@ -75,7 +77,8 @@ const hostApi = oneApi.injectEndpoints({
         if (!data?.HOST) return {}
 
         const monitoring = data?.HOST?.MONITORING
-        const hostShare = data?.HOST_SHARE?.NUMA_NODES
+
+        const hostShare = data?.HOST?.HOST_SHARE?.NUMA_NODES
 
         if (!monitoring || !hostShare) return data.HOST
 

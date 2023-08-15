@@ -28,9 +28,13 @@ import { Accordion, AccordionSummary, FormControl, Grid } from '@mui/material'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import * as FC from 'client/components/FormControl'
+import { useDisableStep } from 'client/components/FormStepper'
 import Legend from 'client/components/Forms/Legend'
 import { INPUT_TYPES } from 'client/constants'
 import { Field } from 'client/utils'
+
+import get from 'lodash.get'
+import { useSelector } from 'react-redux'
 
 const NOT_DEPEND_ATTRIBUTES = [
   'watcher',
@@ -145,79 +149,103 @@ FormWithSchema.propTypes = {
   rootProps: PropTypes.object,
 }
 
-const FieldComponent = memo(({ id, cy, dependOf, ...attributes }) => {
-  const formContext = useFormContext()
+const FieldComponent = memo(
+  ({ id, cy, dependOf, stepControl, ...attributes }) => {
+    const formContext = useFormContext()
+    const disableSteps = useDisableStep()
 
-  const addIdToName = useCallback(
-    (n) => {
-      // removes character '$' and returns
-      if (n.startsWith('$')) return n.slice(1)
+    const currentState = useSelector((state) => state)
 
-      // concat form ID if exists
-      return id ? `${id}.${n}` : n
-    },
-    [id]
-  )
+    const addIdToName = useCallback(
+      (n) => {
+        // removes character '$' and returns
+        if (n.startsWith('$')) return n.slice(1)
 
-  const nameOfDependField = useMemo(() => {
-    if (!dependOf) return null
-
-    return Array.isArray(dependOf)
-      ? dependOf.map(addIdToName)
-      : addIdToName(dependOf)
-  }, [dependOf, addIdToName])
-
-  const valueOfDependField = useWatch({
-    name: nameOfDependField,
-    disabled: dependOf === undefined,
-    defaultValue: Array.isArray(dependOf) ? [] : undefined,
-  })
-
-  const { name, type, htmlType, grid, ...fieldProps } = Object.entries(
-    attributes
-  ).reduce((field, attribute) => {
-    const [attrKey, value] = attribute
-    const isNotDependAttribute = NOT_DEPEND_ATTRIBUTES.includes(attrKey)
-
-    const finalValue =
-      typeof value === 'function' &&
-      !isNotDependAttribute &&
-      !isValidElement(value())
-        ? value(valueOfDependField, formContext)
-        : value
-
-    return { ...field, [attrKey]: finalValue }
-  }, {})
-
-  const dataCy = useMemo(() => `${cy}-${name ?? ''}`.replaceAll('.', '-'), [cy])
-  const inputName = useMemo(() => addIdToName(name), [addIdToName, name])
-  const isHidden = useMemo(() => htmlType === INPUT_TYPES.HIDDEN, [htmlType])
-  const key = useMemo(
-    () =>
-      fieldProps?.values
-        ? `${name}-${JSON.stringify(fieldProps.values)}`
-        : undefined,
-    [fieldProps]
-  )
-
-  if (isHidden) return null
-
-  return (
-    INPUT_CONTROLLER[type] && (
-      <Grid item xs={12} md={6} {...grid}>
-        {createElement(INPUT_CONTROLLER[type], {
-          key,
-          control: formContext.control,
-          cy: dataCy,
-          dependencies: nameOfDependField,
-          name: inputName,
-          type: htmlType === false ? undefined : htmlType,
-          ...fieldProps,
-        })}
-      </Grid>
+        // concat form ID if exists
+        return id ? `${id}.${n}` : n
+      },
+      [id]
     )
-  )
-})
+
+    const nameOfDependField = useMemo(() => {
+      if (!dependOf) return null
+
+      return Array.isArray(dependOf)
+        ? dependOf.map(addIdToName)
+        : addIdToName(dependOf)
+    }, [dependOf, addIdToName])
+
+    const valueOfDependField = useWatch({
+      name: nameOfDependField,
+      disabled: dependOf === undefined,
+      defaultValue: Array.isArray(dependOf) ? [] : undefined,
+    })
+
+    const handleConditionChange = useCallback(
+      (value) => {
+        // eslint-disable-next-line no-shadow
+        const { condition, statePaths, steps } = stepControl || {}
+
+        if (!condition) return
+
+        const stateValues =
+          statePaths?.map((path) => get(currentState, path)) || []
+        const conditionResult = condition(value, ...stateValues)
+        disableSteps && disableSteps(steps, conditionResult)
+      },
+      [stepControl, disableSteps, currentState]
+    )
+
+    const { name, type, htmlType, grid, condition, ...fieldProps } =
+      Object.entries(attributes).reduce((field, attribute) => {
+        const [attrKey, value] = attribute
+        const isNotDependAttribute = NOT_DEPEND_ATTRIBUTES.includes(attrKey)
+
+        const finalValue =
+          typeof value === 'function' &&
+          !isNotDependAttribute &&
+          !isValidElement(value())
+            ? value(valueOfDependField, formContext)
+            : value
+
+        return { ...field, [attrKey]: finalValue }
+      }, {})
+
+    const dataCy = useMemo(
+      () => `${cy}-${name ?? ''}`.replaceAll('.', '-'),
+      [cy]
+    )
+    const inputName = useMemo(() => addIdToName(name), [addIdToName, name])
+    const isHidden = useMemo(() => htmlType === INPUT_TYPES.HIDDEN, [htmlType])
+    const key = useMemo(
+      () =>
+        fieldProps?.values
+          ? `${name}-${JSON.stringify(fieldProps.values)}`
+          : undefined,
+      [fieldProps]
+    )
+
+    if (isHidden) return null
+
+    return (
+      INPUT_CONTROLLER[type] && (
+        <Grid item xs={12} md={6} {...grid}>
+          {createElement(INPUT_CONTROLLER[type], {
+            key,
+            control: formContext.control,
+            cy: dataCy,
+            dependencies: nameOfDependField,
+            name: inputName,
+            type: htmlType === false ? undefined : htmlType,
+            dependOf,
+            onConditionChange: handleConditionChange,
+            ...fieldProps,
+          })}
+        </Grid>
+      )
+    )
+  }
+)
 
 FieldComponent.propTypes = {
   id: PropTypes.string,
@@ -226,6 +254,11 @@ FieldComponent.propTypes = {
     PropTypes.string,
     PropTypes.arrayOf(PropTypes.string),
   ]),
+  stepControl: PropTypes.shape({
+    condition: PropTypes.func,
+    steps: PropTypes.arrayOf(PropTypes.string),
+    statePaths: PropTypes.arrayOf(PropTypes.string),
+  }),
 }
 
 FieldComponent.displayName = 'FieldComponent'
