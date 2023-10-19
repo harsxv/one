@@ -17,6 +17,7 @@ import AllImagesTable from 'client/components/Tables/AllImages'
 import BackupsTable from 'client/components/Tables/Backups'
 import ClustersTable from 'client/components/Tables/Clusters'
 import DatastoresTable from 'client/components/Tables/Datastores'
+import DataGridTable from 'client/components/Tables/DataGrid'
 import DockerHubTagsTable from 'client/components/Tables/DockerHubTags'
 import EnhancedTable from 'client/components/Tables/Enhanced'
 import GroupsTable from 'client/components/Tables/Groups'
@@ -33,6 +34,7 @@ import SkeletonTable from 'client/components/Tables/Skeleton'
 import UsersTable from 'client/components/Tables/Users'
 import VirtualizedTable from 'client/components/Tables/Virtualized'
 import VmsTable from 'client/components/Tables/Vms'
+import VmGroupsTable from 'client/components/Tables/VmGroups'
 import VmTemplatesTable from 'client/components/Tables/VmTemplates'
 import VNetworksTable from 'client/components/Tables/VNetworks'
 import VNetworkTemplatesTable from 'client/components/Tables/VNetworkTemplates'
@@ -52,6 +54,7 @@ export {
   ClustersTable,
   DatastoresTable,
   DockerHubTagsTable,
+  DataGridTable,
   GroupsTable,
   HostsTable,
   ImagesTable,
@@ -64,6 +67,7 @@ export {
   UsersTable,
   VDCsTable,
   VmsTable,
+  VmGroupsTable,
   VmTemplatesTable,
   VNetworksTable,
   VNetworkTemplatesTable,

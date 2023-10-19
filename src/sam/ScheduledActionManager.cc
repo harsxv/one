@@ -22,6 +22,7 @@
 #include "VirtualMachinePool.h"
 #include "DispatchManager.h"
 #include "RequestManagerVirtualMachine.h"
+#include "RaftManager.h"
 
 using namespace std;
 
@@ -57,6 +58,13 @@ void ScheduledActionManager::finalize()
 
 void ScheduledActionManager::timer_action()
 {
+    RaftManager * raftm = Nebula::instance().get_raftm();
+
+    if (!raftm || (!raftm->is_leader() && !raftm->is_solo()))
+    {
+        return;
+    }
+
     scheduled_vm_actions();
 
     update_backup_counters();
@@ -180,7 +188,36 @@ void ScheduledActionManager::run_vm_backups()
         if (!vm)
         {
             ostringstream oss;
-            oss << "Unable scheduled backup for non-exist VM: " << vm_id;
+
+            oss << "Unable to run scheduled backup for non-exist VM: " << vm_id;
+
+            NebulaLog::debug("SCH", oss.str());
+            continue;
+        }
+
+        if (!vm->hasHistory())
+        {
+            ostringstream oss;
+
+            oss << "Unable to run scheduled backup for VM: " << vm_id
+                << ", the VM doesn't have history.";
+
+            NebulaLog::debug("SCH", oss.str());
+            continue;
+        }
+
+        int bj_id = vm->backups().backup_job_id();
+
+        if ( bj_id != -1)
+        {
+            ostringstream oss;
+
+            oss << "Unable to launch scheduled backup for VM " << vm_id
+                << ", the VM is part of Backup Job ID " << bj_id;
+
+            vm->set_template_error_message(oss.str());
+
+            vm_pool->update(vm.get());
 
             NebulaLog::debug("SCH", oss.str());
             continue;
@@ -291,11 +328,10 @@ void ScheduledActionManager::backup_jobs()
             continue;
         }
 
-        // Copy (not reference) of outdated and backing_up vms (modified in loop)
         auto vms = bj->backup_vms();
 
-        auto outdated   = bj->outdated();
-        auto backing_up = bj->backing_up();
+        auto& outdated   = bj->outdated();
+        auto& backing_up = bj->backing_up();
 
         auto mode  = bj->exec_mode();
         auto ds_id = bj->ds_id();
@@ -362,6 +398,16 @@ void ScheduledActionManager::backup_jobs()
                 continue;
             }
 
+            if (!vm->hasHistory())
+            {
+                ostringstream oss;
+                oss << "Unable to run backup for VM: " << vm_id
+                    << ", the VM doesn't have history.";
+
+                NebulaLog::debug("SCH", oss.str());
+                continue;
+            }
+
             int hid = vm->get_hid();
 
             if (_max_backups_host != 0 && host_backups[hid] >= _max_backups_host)
@@ -404,8 +450,6 @@ void ScheduledActionManager::backup_jobs()
                 continue;
             }
 
-            backups.backup_job_id(bj_id);
-
             vm_pool->update(vm.get());
 
             vm.reset();
@@ -419,6 +463,9 @@ void ScheduledActionManager::backup_jobs()
                                  UserPool::ONEADMIN_ID,
                                  GroupPool::ONEADMIN_ID,
                                  PoolObjectSQL::VM);
+
+            NebulaLog::info("SCH", "Backup Job " + to_string(bj_id) +
+                                   " executing backup for VM " + to_string(vm_id) );
 
             auto ec = vm_backup.request_execute(ra, vm_id, ds_id, reset);
 
@@ -646,6 +693,11 @@ int ScheduledActionManager::vm_action_call(int vmid, int sa_id, string& error)
     {
         int dsid = -1;
         bool reset = false;
+
+        if (args.size() == 1)
+        {
+            args.push("0"); // For backward compatibility set reset = false
+        }
 
         if (!parse_args(args, dsid, reset))
         {

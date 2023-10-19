@@ -263,6 +263,7 @@ else
 fi
 
 SHARE_DIRS="$SHARE_LOCATION/examples \
+            $SHARE_LOCATION/examples/external_scheduler \
             $SHARE_LOCATION/examples/host_hooks \
             $SHARE_LOCATION/examples/network_hooks \
             $SHARE_LOCATION/websockify \
@@ -770,6 +771,7 @@ INSTALL_FILES=(
     NETWORK_NODEPORT_FILES:$VAR_LOCATION/remotes/vnm/nodeport
     EXAMPLE_SHARE_FILES:$SHARE_LOCATION/examples
     EXAMPLE_HOST_HOOKS_SHARE_FILES:$SHARE_LOCATION/examples/host_hooks
+    EXAMPLE_EXTERNAL_SCHED_FILES:$SHARE_LOCATION/examples/external_scheduler
     LXD_NETWORK_HOOKS:$SHARE_LOCATION/examples/network_hooks
     WEBSOCKIFY_SHARE_RUN_FILES:$SHARE_LOCATION/websockify
     WEBSOCKIFY_SHARE_MODULE_FILES:$SHARE_LOCATION/websockify/websockify
@@ -1059,6 +1061,7 @@ RUBY_LIB_FILES="src/mad/ruby/ActionManager.rb \
                 src/vmm_mad/remotes/equinix/equinix_driver.rb \
                 src/vnm_mad/remotes/elastic/aws_vnm.rb \
                 src/vnm_mad/remotes/elastic/equinix_vnm.rb \
+                src/vnm_mad/remotes/elastic/equinix.rb \
                 src/vnm_mad/remotes/elastic/vultr_vnm.rb"
 
 #-------------------------------------------------------------------------------
@@ -1477,6 +1480,7 @@ IM_PROBES_KVM_HOST_MONITOR_FILES="\
 IM_PROBES_KVM_HOST_SYSTEM_FILES="\
      src/im_mad/remotes/kvm-probes.d/host/system/architecture.sh \
      src/im_mad/remotes/kvm-probes.d/host/system/cpu.sh \
+     src/im_mad/remotes/kvm-probes.d/host/system/cpu_features.sh \
      src/im_mad/remotes/kvm-probes.d/host/system/linux_host.rb \
      src/im_mad/remotes/kvm-probes.d/host/system/machines_models.rb \
      src/im_mad/remotes/kvm-probes.d/host/system/monitor_ds.rb \
@@ -2369,6 +2373,11 @@ EXAMPLE_SHARE_FILES="share/examples/vm.template \
                      share/examples/public.net"
 
 #-------------------------------------------------------------------------------
+# Sample files, to be installed under $SHARE_LOCATION/examples/external_scheduler
+#-------------------------------------------------------------------------------
+EXAMPLE_EXTERNAL_SCHED_FILES="share/examples/external_scheduler/external_scheduler_server.rb"
+
+#-------------------------------------------------------------------------------
 # Sample files, to be installed under $SHARE_LOCATION/examples/host_hooks
 #-------------------------------------------------------------------------------
 
@@ -2768,6 +2777,7 @@ SUNSTONE_MODELS_JSON_FILES="src/sunstone/models/OpenNebulaJSON/HostJSON.rb \
                     src/sunstone/models/OpenNebulaJSON/SecurityGroupJSON.rb \
                     src/sunstone/models/OpenNebulaJSON/VdcJSON.rb \
                     src/sunstone/models/OpenNebulaJSON/VirtualRouterJSON.rb \
+                    src/sunstone/models/OpenNebulaJSON/BackupJobJSON.rb \
                     src/sunstone/models/OpenNebulaJSON/MarketPlaceJSON.rb \
                     src/sunstone/models/OpenNebulaJSON/MarketPlaceAppJSON.rb"
 
@@ -2963,6 +2973,7 @@ FIREEDGE_SUNSTONE_ETC="src/fireedge/etc/sunstone/sunstone-server.conf \
 
 FIREEDGE_SUNSTONE_ETC_VIEW_ADMIN="src/fireedge/etc/sunstone/admin/vm-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/vm-template-tab.yaml \
+                                src/fireedge/etc/sunstone/admin/vm-group-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/marketplace-app-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/vnet-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/image-tab.yaml\
@@ -2971,6 +2982,7 @@ FIREEDGE_SUNSTONE_ETC_VIEW_ADMIN="src/fireedge/etc/sunstone/admin/vm-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/backup-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/datastore-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/vdc-tab.yaml \
+				src/fireedge/etc/sunstone/admin/user-tab.yaml \
                                 src/fireedge/etc/sunstone/admin/host-tab.yaml"
 
 FIREEDGE_SUNSTONE_ETC_VIEW_USER="src/fireedge/etc/sunstone/user/vm-tab.yaml \

@@ -226,7 +226,7 @@ void BackupJobSchedAdd::request_execute(xmlrpc_c::paramList const& _paramList,
         return;
     }
 
-    const VectorAttribute * va = tmpl->get("SCHED_ACTION");
+    VectorAttribute * va = tmpl->get("SCHED_ACTION");
 
     if ( va == nullptr )
     {
@@ -236,7 +236,7 @@ void BackupJobSchedAdd::request_execute(xmlrpc_c::paramList const& _paramList,
         return;
     }
 
-    auto sa_id = sapool->allocate(PoolObjectSQL::BACKUPJOB, bj_id, time(0), va, att.resp_msg);
+    auto sa_id = sapool->allocate(PoolObjectSQL::BACKUPJOB, bj_id, 0, va, att.resp_msg);
 
     if ( sa_id < 0 )
     {

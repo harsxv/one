@@ -400,6 +400,27 @@ static string get_disk_bus(const std::string &machine,
     return "ide";
 }
 
+static void set_queues(string& queue, const string& vcpu)
+{
+    one_util::tolower(queue);
+
+    if ( queue == "auto" )
+    {
+        queue = vcpu;
+    }
+    else if (!queue.empty())
+    {
+        char * end_ptr;
+
+        strtol(queue.c_str(), &end_ptr, 10);
+
+        if ( *end_ptr != '\0' )
+        {
+            queue.clear();
+        }
+    }
+}
+
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
@@ -495,160 +516,165 @@ int LibVirtDriver::deployment_description_kvm(
     int     memory;
     int     memory_max;
 
-    string  emulator_path = "";
+    string  emulator_path;
 
-    string  kernel     = "";
-    string  initrd     = "";
-    string  root       = "";
-    string  kernel_cmd = "";
-    string  bootloader = "";
-    string  arch       = "";
-    string  machine    = "";
+    string  kernel;
+    string  initrd;
+    string  root;
+    string  kernel_cmd;
+    string  bootloader;
+    string  arch;
+    string  machine;
 
     vector<string> boots;
 
-    string  cpu_model = "";
-    string  cpu_mode  = "";
+    string  cpu_model;
+    string  cpu_feature;
+    string  cpu_mode;
 
     vector<const VectorAttribute *> disk;
     const VectorAttribute * context;
 
-    string  type            = "";
-    string  disk_type       = "";
-    string  target          = "";
-    string  bus             = "";
-    string  ro              = "";
-    string  driver          = "";
-    string  cache           = "";
-    string  disk_io         = "";
-    string  discard         = "";
-    string  source          = "";
-    string  clone           = "";
-    string  shareable       = "";
-    string  ceph_host       = "";
-    string  ceph_secret     = "";
-    string  ceph_user       = "";
-    string  iscsi_host      = "";
-    string  iscsi_user      = "";
-    string  iscsi_usage     = "";
-    string  iscsi_iqn       = "";
-    string  pool_name       = "";
-    string  sheepdog_host   = "";
-    string  gluster_host    = "";
-    string  gluster_volume  = "";
-    string  luks_secret     = "";
+    string type;
+    string disk_type;
+    string target;
+    string bus;
+    string ro;
+    string driver;
+    string cache;
+    string disk_io;
+    string discard;
+    string source;
+    string clone;
+    string blk_queues;
+    string shareable;
+    string ceph_host;
+    string ceph_secret;
+    string ceph_user;
+    string iscsi_host;
+    string iscsi_user;
+    string iscsi_usage;
+    string iscsi_iqn;
+    string pool_name;
+    string sheepdog_host;
+    string gluster_host;
+    string gluster_volume;
+    string luks_secret;
 
-    string  total_bytes_sec            = "";
-    string  total_bytes_sec_max_length = "";
-    string  total_bytes_sec_max        = "";
-    string  read_bytes_sec             = "";
-    string  read_bytes_sec_max_length  = "";
-    string  read_bytes_sec_max         = "";
-    string  write_bytes_sec            = "";
-    string  write_bytes_sec_max_length = "";
-    string  write_bytes_sec_max        = "";
-    string  total_iops_sec             = "";
-    string  total_iops_sec_max_length  = "";
-    string  total_iops_sec_max         = "";
-    string  read_iops_sec              = "";
-    string  read_iops_sec_max_length   = "";
-    string  read_iops_sec_max          = "";
-    string  write_iops_sec             = "";
-    string  write_iops_sec_max_length  = "";
-    string  write_iops_sec_max         = "";
-    string  size_iops_sec;
-    string  iothreadid;
+    string total_bytes_sec;
+    string total_bytes_sec_max_length;
+    string total_bytes_sec_max;
+    string read_bytes_sec;
+    string read_bytes_sec_max_length;
+    string read_bytes_sec_max;
+    string write_bytes_sec;
+    string write_bytes_sec_max_length;
+    string write_bytes_sec_max;
+    string total_iops_sec;
+    string total_iops_sec_max_length;
+    string total_iops_sec_max;
+    string read_iops_sec;
+    string read_iops_sec_max_length;
+    string read_iops_sec_max;
+    string write_iops_sec;
+    string write_iops_sec_max_length;
+    string write_iops_sec_max;
+    string size_iops_sec;
+    string iothreadid;
 
-    string  default_total_bytes_sec            = "";
-    string  default_total_bytes_sec_max_length = "";
-    string  default_total_bytes_sec_max        = "";
-    string  default_read_bytes_sec             = "";
-    string  default_read_bytes_sec_max_length  = "";
-    string  default_read_bytes_sec_max         = "";
-    string  default_write_bytes_sec            = "";
-    string  default_write_bytes_sec_max_length = "";
-    string  default_write_bytes_sec_max        = "";
-    string  default_total_iops_sec             = "";
-    string  default_total_iops_sec_max_length  = "";
-    string  default_total_iops_sec_max         = "";
-    string  default_read_iops_sec              = "";
-    string  default_read_iops_sec_max_length   = "";
-    string  default_read_iops_sec_max          = "";
-    string  default_write_iops_sec             = "";
-    string  default_write_iops_sec_max_length  = "";
-    string  default_write_iops_sec_max         = "";
-    string  default_size_iops_sec;
+    string default_total_bytes_sec;
+    string default_total_bytes_sec_max_length;
+    string default_total_bytes_sec_max;
+    string default_read_bytes_sec;
+    string default_read_bytes_sec_max_length;
+    string default_read_bytes_sec_max;
+    string default_write_bytes_sec;
+    string default_write_bytes_sec_max_length;
+    string default_write_bytes_sec_max;
+    string default_total_iops_sec;
+    string default_total_iops_sec_max_length;
+    string default_total_iops_sec_max;
+    string default_read_iops_sec;
+    string default_read_iops_sec_max_length;
+    string default_read_iops_sec_max;
+    string default_write_iops_sec;
+    string default_write_iops_sec_max_length;
+    string default_write_iops_sec_max;
+    string default_size_iops_sec;
 
-    int     disk_id;
-    int     order;
-    string  default_driver          = "";
-    string  default_driver_cache    = "";
-    string  default_driver_disk_io  = "";
-    string  default_driver_discard  = "";
-    bool    readonly;
+    int    disk_id;
+    int    order;
+    string default_driver;
+    string default_driver_cache;
+    string default_driver_disk_io;
+    string default_driver_discard;
+    string default_blk_queues;
+    bool   readonly;
 
     vector<const VectorAttribute *> nic;
 
-    string  mac    = "";
-    string  bridge = "";
-    string  vn_mad = "";
-    string  script = "";
-    string  model  = "";
-    string  ip     = "";
-    string  vrouter_ip = "";
-    string  filter = "";
-    string  virtio_queues = "";
-    string  bridge_type = "";
-    string  nic_id = "";
+    string mac;
+    string bridge;
+    string vn_mad;
+    string script;
+    string model;
+    string ip;
+    string vrouter_ip;
+    string filter;
+    string virtio_queues;
+    string bridge_type;
+    string nic_id;
 
-    string  i_avg_bw = "";
-    string  i_peak_bw = "";
-    string  i_peak_kb = "";
-    string  o_avg_bw = "";
-    string  o_peak_bw = "";
-    string  o_peak_kb = "";
+    string i_avg_bw;
+    string i_peak_bw;
+    string i_peak_kb;
+    string o_avg_bw;
+    string o_peak_bw;
+    string o_peak_kb;
 
-    string  default_filter = "";
-    string  default_model  = "";
+    string default_filter;
+    string default_model ;
 
     const VectorAttribute * graphics;
+
+    const VectorAttribute * video;
 
     const VectorAttribute * input;
 
     vector<const VectorAttribute *> pci;
 
-    string  domain   = "";
+    string domain;
     /* bus is already defined for disks */
-    string  slot     = "";
-    string  func     = "";
+    string slot;
+    string func;
 
-    string vm_domain = "";
-    string vm_bus    = "";
-    string vm_slot   = "";
-    string vm_func   = "";
+    string vm_domain;
+    string vm_bus;
+    string vm_slot;
+    string vm_func;
 
-    bool pae                = false;
-    bool acpi               = false;
-    bool apic               = false;
-    bool hyperv             = false;
-    bool localtime          = false;
-    bool guest_agent        = false;
-    int  virtio_scsi_queues = 0;
-    int  scsi_targets_num   = 0;
-    int  iothreads          = 0;
-    int  iothread_actual    = 1;
+    bool pae         = false;
+    bool acpi        = false;
+    bool apic        = false;
+    bool hyperv      = false;
+    bool localtime   = false;
+    bool guest_agent = false;
 
-    string hyperv_options = "";
+    int  iothreads        = 0;
+    int  iothread_actual  = 1;
+
+    string virtio_scsi_queues;
+    string hyperv_options;
 
     vector<const VectorAttribute *> raw;
-    string default_raw = "";
-    string data        = "";
+    string default_raw;
+    string data;
 
     const VectorAttribute * topology;
     vector<const VectorAttribute *> nodes;
 
-    std::string numa_tune = "";
-    std::string mbacking  = "";
+    std::string numa_tune;
+    std::string mbacking;
 
     std::string sd_bus;
     std::string disk_bus;
@@ -917,6 +943,7 @@ int LibVirtDriver::deployment_description_kvm(
     // CPU SECTION
     // ------------------------------------------------------------------------
     get_attribute(vm, host, cluster, "CPU_MODEL", "MODEL", cpu_model);
+    get_attribute(vm, nullptr, nullptr, "CPU_MODEL", "FEATURES", cpu_feature);
 
     if (cpu_model == "host-passthrough")
     {
@@ -944,6 +971,19 @@ int LibVirtDriver::deployment_description_kvm(
         else
         {
             file << ">\n";
+        }
+
+        if ( !cpu_feature.empty() && !cpu_model.empty() )
+        {
+            vector<string> features;
+
+            one_util::split(cpu_feature, ',', features);
+
+            for (const auto& feature: features)
+            {
+                file << "\t\t<feature policy='require'"
+                    << " name=" << one_util::escape_xml_attr(feature) << "/>\n";
+            }
         }
 
         if (nodes.empty() && memory_hotplug)
@@ -987,9 +1027,10 @@ int LibVirtDriver::deployment_description_kvm(
     file << "\t<devices>" << endl;
 
     get_attribute(vm, host, cluster, "EMULATOR", emulator_path);
+
     if (emulator_path.empty())
     {
-        emulator_path = "/usr/bin/kvm";
+        emulator_path = "/usr/bin/qemu-kvm-one";
     }
 
     file << "\t\t<emulator>" << one_util::escape_xml(emulator_path)
@@ -1041,7 +1082,9 @@ int LibVirtDriver::deployment_description_kvm(
 
     get_attribute(nullptr, host, cluster, "DISK", "SIZE_IOPS_SEC", default_size_iops_sec);
 
-    // ------------------------------------------------------------------------
+    get_attribute(vm, host, cluster, "FEATURES", "VIRTIO_BLK_QUEUES", default_blk_queues);
+
+    // -------------------------------------------------------------------------
 
     num = vm->get_template_attribute("DISK", disk);
 
@@ -1057,6 +1100,7 @@ int LibVirtDriver::deployment_description_kvm(
         discard   = disk[i]->vector_value("DISCARD");
         source    = disk[i]->vector_value("SOURCE");
         clone     = disk[i]->vector_value("CLONE");
+        blk_queues= disk[i]->vector_value("VIRTIO_BLK_QUEUES");
         shareable = disk[i]->vector_value("SHAREABLE");
 
         ceph_host   = disk[i]->vector_value("CEPH_HOST");
@@ -1443,6 +1487,22 @@ int LibVirtDriver::deployment_description_kvm(
             }
         }
 
+        if (!blk_queues.empty())
+        {
+            set_queues(blk_queues, vcpu);
+        }
+        else if (!default_blk_queues.empty())
+        {
+            set_queues(default_blk_queues, vcpu);
+
+            blk_queues = default_blk_queues;
+        }
+
+        if (!blk_queues.empty())
+        {
+            file << " queues=" << one_util::escape_xml_attr(blk_queues);
+        }
+
         file << "/>" << endl;
 
         // ---- I/O Options ----
@@ -1512,7 +1572,6 @@ int LibVirtDriver::deployment_description_kvm(
             {
                 file << "\t\t\t<address type='drive' controller='0' bus='0' " <<
                      "target='" << target_number << "' unit='0'/>" << endl;
-                scsi_targets_num++;
             }
         }
 
@@ -1581,6 +1640,34 @@ int LibVirtDriver::deployment_description_kvm(
                 " attach context, will continue without it.");
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Controllers:
+    //   - virtio-scsi, for non SCSI disk domains allows hotplug of new disks
+    // -------------------------------------------------------------------------
+    get_attribute(vm, host, cluster, "FEATURES", "VIRTIO_SCSI_QUEUES", virtio_scsi_queues);
+
+    set_queues(virtio_scsi_queues, vcpu);
+
+    file << "\t\t<controller type='scsi' index='0' model='virtio-scsi'>" << endl
+         << "\t\t\t<driver";
+
+    if ( !virtio_scsi_queues.empty() )
+    {
+        file << " queues=" << one_util::escape_xml_attr(virtio_scsi_queues);
+    }
+    else
+    {
+        file << " queues='1'";
+    }
+
+    if ( iothreads > 0 )
+    {
+        file << " iothread=" << one_util::escape_xml_attr(iothread_actual);
+    }
+
+    file << "/>" << endl
+         << "\t\t</controller>" << endl;
 
     // ------------------------------------------------------------------------
     // Network interfaces
@@ -1866,6 +1953,71 @@ int LibVirtDriver::deployment_description_kvm(
     }
 
     // ------------------------------------------------------------------------
+    // Video
+    // ------------------------------------------------------------------------
+
+    video = vm->get_template_attribute("VIDEO");
+
+    if ( video != 0 )
+    {
+        bool iommu;
+        bool ats;
+        int  vram;
+
+        string resolution;
+
+        get_attribute(vm, host, cluster, "VIDEO", "IOMMU", iommu);
+        get_attribute(vm, host, cluster, "VIDEO", "ATS",   ats);
+        get_attribute(vm, host, cluster, "VIDEO", "TYPE",  type);
+        get_attribute(vm, host, cluster, "VIDEO", "VRAM",  vram);
+        get_attribute(vm, host, cluster, "VIDEO", "RESOLUTION", resolution);
+
+        file << "\t\t<video>\n";
+
+        if ( type == "virtio"  && ( iommu || ats ) )
+        {
+            file << "\t\t\t<driver";
+
+            if ( iommu ) {
+                file << " iommu='on'";
+            }
+
+            if ( ats ) {
+                file << " ats='on'";
+            }
+
+            file << "/>\n";
+        }
+
+        one_util::tolower(type);
+
+        file << "\t\t\t<model type=" << one_util::escape_xml_attr(type);
+
+        if ( vram >= 1024 && type != "none" )
+        {
+            file << " vram=" << one_util::escape_xml_attr(vram);
+        }
+
+        file << ">\n";
+
+        if ( !resolution.empty() && type != "none" && type != "cirrus" )
+        {
+            vector<string> res_dims;
+
+            res_dims = one_util::split(resolution, 'x');
+
+            file << "\t\t\t\t<resolution"
+                    << " x=" << one_util::escape_xml_attr(res_dims[0])
+                    << " y=" << one_util::escape_xml_attr(res_dims[1])
+                    << "/>\n";
+        }
+
+        file << "\t\t\t</model>\n";
+
+        file << "\t\t</video>\n";
+    }
+
+    // ------------------------------------------------------------------------
     // Input
     // ------------------------------------------------------------------------
     input = vm->get_template_attribute("INPUT");
@@ -1938,16 +2090,17 @@ int LibVirtDriver::deployment_description_kvm(
                 << "/>\n";
             file << "\t\t\t</source>\n";
 
-            if ( !vm_domain.empty() && !vm_bus.empty() && !vm_slot.empty() &&
-                    !vm_func.empty() )
-            {
-                file << "\t\t\t\t<address type='pci'"
-                        << " domain="   << one_util::escape_xml_attr(vm_domain)
-                        << " bus="      << one_util::escape_xml_attr(vm_bus)
-                        << " slot="     << one_util::escape_xml_attr(vm_slot)
-                        << " function=" << one_util::escape_xml_attr(vm_func)
-                    << "/>\n";
-            }
+        }
+
+        if ( !vm_domain.empty() && !vm_bus.empty() && !vm_slot.empty() &&
+                !vm_func.empty() )
+        {
+            file << "\t\t\t\t<address type='pci'"
+                    << " domain="   << one_util::escape_xml_attr(vm_domain)
+                    << " bus="      << one_util::escape_xml_attr(vm_bus)
+                    << " slot="     << one_util::escape_xml_attr(vm_slot)
+                    << " function=" << one_util::escape_xml_attr(vm_func)
+                << "/>\n";
         }
 
         file << "\t\t</hostdev>" << endl;
@@ -1989,7 +2142,6 @@ int LibVirtDriver::deployment_description_kvm(
     get_attribute(vm, host, cluster, "FEATURES", "HYPERV", hyperv);
     get_attribute(vm, host, cluster, "FEATURES", "LOCALTIME", localtime);
     get_attribute(vm, host, cluster, "FEATURES", "GUEST_AGENT", guest_agent);
-    get_attribute(vm, host, cluster, "FEATURES", "VIRTIO_SCSI_QUEUES", virtio_scsi_queues);
 
     if ( acpi || pae || apic || hyperv || boot_secure)
     {
@@ -2027,9 +2179,29 @@ int LibVirtDriver::deployment_description_kvm(
         file << "\t</features>" << endl;
     }
 
-    if ( localtime )
+    if ( localtime || hyperv )
     {
-        file << "\t<clock offset='localtime'/>" << endl;
+        string htimers;
+
+        get_attribute(vm, host, cluster, "HYPERV_TIMERS", htimers);
+
+        file << "\t<clock";
+
+        if ( localtime )
+        {
+            file << " offset='localtime'>" << endl;
+        }
+        else //UTC is set as the clock offset by default
+        {
+            file << " offset='utc'>" << endl;
+        }
+
+        if (!htimers.empty())
+        {
+            file << htimers << endl;
+        }
+
+        file << "\t</clock>" << endl;
     }
 
     if ( guest_agent )
@@ -2039,30 +2211,6 @@ int LibVirtDriver::deployment_description_kvm(
              << "\t\t\t<source mode='bind'/>"
              << "<target type='virtio' name='org.qemu.guest_agent.0'/>" << endl
              << "\t\t</channel>" << endl
-             << "\t</devices>" << endl;
-    }
-
-    if ( virtio_scsi_queues > 0 || scsi_targets_num > 1)
-    {
-        file << "\t<devices>" << endl
-             << "\t\t<controller type='scsi' index='0' model='virtio-scsi'>"
-             << endl;
-
-        file << "\t\t\t<driver";
-
-        if ( virtio_scsi_queues > 0 )
-        {
-            file << " queues=" << one_util::escape_xml_attr(virtio_scsi_queues);
-        }
-
-        if ( iothreads > 0 )
-        {
-            file << " iothread=" << one_util::escape_xml_attr(iothread_actual);
-        }
-
-        file << "/>" << endl;
-
-        file << "\t\t</controller>" << endl
              << "\t</devices>" << endl;
     }
 

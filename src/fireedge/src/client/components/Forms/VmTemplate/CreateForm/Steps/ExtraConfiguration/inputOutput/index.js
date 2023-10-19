@@ -25,12 +25,13 @@ import {
 } from 'client/components/Forms/VmTemplate/CreateForm/Steps/ExtraConfiguration'
 import InputsSection, { SECTION_ID as INPUT_ID } from './inputsSection'
 import PciDevicesSection, { SECTION_ID as PCI_ID } from './pciDevicesSection'
+import VideoSection, { SECTION_ID as VIDEO_ID } from './videoSection'
 import { GRAPHICS_FIELDS } from './schema'
 import { T } from 'client/constants'
 
-export const TAB_ID = ['GRAPHICS', INPUT_ID, PCI_ID]
+export const TAB_ID = ['GRAPHICS', INPUT_ID, PCI_ID, VIDEO_ID]
 
-const InputOutput = ({ hypervisor }) => (
+const InputOutput = ({ hypervisor, oneConfig, adminGroup }) => (
   <Stack
     display="grid"
     gap="1em"
@@ -38,12 +39,28 @@ const InputOutput = ({ hypervisor }) => (
   >
     <FormWithSchema
       cy={`${EXTRA_ID}-io-graphics`}
-      fields={GRAPHICS_FIELDS(hypervisor)}
+      fields={GRAPHICS_FIELDS(hypervisor, oneConfig, adminGroup)}
       legend={T.Graphics}
       id={EXTRA_ID}
     />
-    <InputsSection stepId={EXTRA_ID} hypervisor={hypervisor} />
-    <PciDevicesSection stepId={EXTRA_ID} hypervisor={hypervisor} />
+    <InputsSection
+      stepId={EXTRA_ID}
+      hypervisor={hypervisor}
+      oneConfig={oneConfig}
+      adminGroup={adminGroup}
+    />
+    <PciDevicesSection
+      stepId={EXTRA_ID}
+      hypervisor={hypervisor}
+      oneConfig={oneConfig}
+      adminGroup={adminGroup}
+    />
+    <VideoSection
+      stepId={EXTRA_ID}
+      hypervisor={hypervisor}
+      oneConfig={oneConfig}
+      adminGroup={adminGroup}
+    />
   </Stack>
 )
 
@@ -52,6 +69,8 @@ InputOutput.propTypes = {
   setFormData: PropTypes.func,
   hypervisor: PropTypes.string,
   control: PropTypes.object,
+  oneConfig: PropTypes.object,
+  adminGroup: PropTypes.bool,
 }
 
 InputOutput.displayName = 'InputOutput'

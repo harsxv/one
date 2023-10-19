@@ -1073,6 +1073,11 @@ int VirtualMachine::insert(SqlDB * db, string& error_str)
         goto error_graphics;
     }
 
+    if ( parse_video(error_str, user_obj_template.get()) != 0 )
+    {
+        goto error_video;
+    }
+
     // -------------------------------------------------------------------------
     // Get and set DEPLOY_ID for imported VMs
     // -------------------------------------------------------------------------
@@ -1130,6 +1135,7 @@ error_boot_order:
 error_context:
 error_requirements:
 error_graphics:
+error_video:
 error_backup:
 error_rollback:
     release_disk_images(quotas, true);
@@ -1599,6 +1605,9 @@ int VirtualMachine::automatic_requirements(set<int>& cluster_ids,
         return -1;
     }
 
+    // -------------------------------------------------------------------------
+    // Set automatic Host requirements
+    // -------------------------------------------------------------------------
     if ( !cluster_ids.empty() )
     {
         auto i = cluster_ids.begin();
@@ -1644,11 +1653,28 @@ int VirtualMachine::automatic_requirements(set<int>& cluster_ids,
         oss << "))";
     }
 
+    const VectorAttribute * cpu_model = obj_template->get("CPU_MODEL");
+
+    if ( cpu_model != nullptr )
+    {
+        vector<string> features_v;
+        const string&  features_s = cpu_model->vector_value("FEATURES");
+
+        one_util::split(features_s, ',', features_v);
+
+        for (const auto& feature: features_v)
+        {
+            oss << " & (KVM_CPU_FEATURES = \"*" << feature << "*\")";
+        }
+    }
+
     obj_template->add("AUTOMATIC_REQUIREMENTS", oss.str());
 
     oss.str("");
 
+    // -------------------------------------------------------------------------
     // Set automatic System DS requirements
+    // -------------------------------------------------------------------------
 
     if ( !cluster_ids.empty() || !datastore_ids.empty() )
     {
@@ -2154,7 +2180,7 @@ int VirtualMachine::nic_update(int vnid)
 
     for (auto nic : nics)
     {
-        if (nic->is_alias() || nic->is_pci())
+        if (nic->is_alias())
         {
             continue;
         }
@@ -2787,7 +2813,7 @@ int VirtualMachine::replace_template(
     if (user_obj_template)
     {
         if (keep_restricted &&
-            new_tmpl->check_restricted(ra, user_obj_template.get()))
+            new_tmpl->check_restricted(ra, user_obj_template.get(), false))
         {
             error = "Tried to change restricted attribute: " + ra;
 
@@ -2840,7 +2866,7 @@ int VirtualMachine::append_template(
     auto old_user_tmpl = make_unique<VirtualMachineTemplate>(*user_obj_template);
 
     if (keep_restricted &&
-        new_tmpl->check_restricted(rname, user_obj_template.get()))
+        new_tmpl->check_restricted(rname, user_obj_template.get(), true))
     {
         error ="User Template includes a restricted attribute " + rname;
 
@@ -3042,7 +3068,7 @@ int VirtualMachine::updateconf(VirtualMachineTemplate* tmpl, string &err,
     }
 
     // -------------------------------------------------------------------------
-    // Update OS, FEATURES, INPUT, GRAPHICS, RAW, CPU_MODEL
+    // Update OS, FEATURES, INPUT, GRAPHICS, VIDEO, RAW, CPU_MODEL
     // -------------------------------------------------------------------------
     replace_vector_values(obj_template.get(), tmpl, "OS", append);
 
@@ -3056,6 +3082,8 @@ int VirtualMachine::updateconf(VirtualMachineTemplate* tmpl, string &err,
     replace_vector_values(obj_template.get(), tmpl, "INPUT", append);
 
     replace_vector_values(obj_template.get(), tmpl, "GRAPHICS", append);
+
+    replace_vector_values(obj_template.get(), tmpl, "VIDEO", append);
 
     replace_vector_values(obj_template.get(), tmpl, "RAW", append);
 
@@ -3159,9 +3187,15 @@ int VirtualMachine::updateconf(VirtualMachineTemplate* tmpl, string &err,
     }
 
     // -------------------------------------------------------------------------
-    // Parse graphics attribute
+    // Parse graphics & video attribute
     // -------------------------------------------------------------------------
     if ( parse_graphics(err, obj_template.get()) != 0 )
+    {
+        NebulaLog::log("ONE",Log::ERROR, err);
+        return -1;
+    }
+
+    if ( parse_video(err, obj_template.get()) != 0 )
     {
         NebulaLog::log("ONE",Log::ERROR, err);
         return -1;

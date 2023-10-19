@@ -17,49 +17,88 @@
 import { BaseSchema, string } from 'yup'
 
 import { BOOT_FIELDS } from './bootSchema'
+import { CPU_MODEL_FIELDS } from './cpuModelSchema'
+import { FEATURES_FIELDS } from './featuresSchema'
 import { KERNEL_FIELDS } from './kernelSchema'
 import { RAMDISK_FIELDS } from './ramdiskSchema'
-import { FEATURES_FIELDS } from './featuresSchema'
 import { RAW_FIELDS } from './rawSchema'
 
+import { HYPERVISORS, T } from 'client/constants'
 import {
   Field,
   Section,
-  getObjectSchemaFromFields,
+  disableFields,
   filterFieldsByHypervisor,
+  getObjectSchemaFromFields,
 } from 'client/utils'
-import { T, HYPERVISORS } from 'client/constants'
 
 /**
  * @param {HYPERVISORS} [hypervisor] - Template hypervisor
+ * @param {object} oneConfig - Config of oned.conf
+ * @param {boolean} adminGroup - User is admin or not
  * @returns {Section[]} Sections
  */
-const SECTIONS = (hypervisor) => [
+const SECTIONS = (hypervisor, oneConfig, adminGroup) => [
   {
-    id: 'os-boot',
-    legend: T.Boot,
-    fields: filterFieldsByHypervisor(BOOT_FIELDS, hypervisor),
+    id: 'os-cpu-model',
+    legend: T.CpuModel,
+    fields: disableFields(
+      filterFieldsByHypervisor(CPU_MODEL_FIELDS, hypervisor),
+      'OS',
+      oneConfig,
+      adminGroup
+    ),
   },
   {
     id: 'os-features',
     legend: T.Features,
-    fields: filterFieldsByHypervisor(FEATURES_FIELDS, hypervisor),
+    fields: disableFields(
+      filterFieldsByHypervisor(FEATURES_FIELDS, hypervisor),
+      'OS',
+      oneConfig,
+      adminGroup
+    ),
   },
   {
     id: 'os-kernel',
     legend: T.Kernel,
-    fields: filterFieldsByHypervisor(KERNEL_FIELDS, hypervisor),
+    fields: disableFields(
+      filterFieldsByHypervisor(KERNEL_FIELDS, hypervisor),
+      'OS',
+      oneConfig,
+      adminGroup
+    ),
   },
   {
     id: 'os-ramdisk',
     legend: T.Ramdisk,
-    fields: filterFieldsByHypervisor(RAMDISK_FIELDS, hypervisor),
+    fields: disableFields(
+      filterFieldsByHypervisor(RAMDISK_FIELDS, hypervisor),
+      'OS',
+      oneConfig,
+      adminGroup
+    ),
+  },
+  {
+    id: 'os-boot',
+    legend: T.Boot,
+    fields: disableFields(
+      filterFieldsByHypervisor(BOOT_FIELDS, hypervisor),
+      'OS',
+      oneConfig,
+      adminGroup
+    ),
   },
   {
     id: 'os-raw',
     legend: T.RawData,
     legendTooltip: T.RawDataConcept,
-    fields: filterFieldsByHypervisor(RAW_FIELDS, hypervisor),
+    fields: disableFields(
+      filterFieldsByHypervisor(RAW_FIELDS, hypervisor),
+      'OS',
+      oneConfig,
+      adminGroup
+    ),
   },
 ]
 
@@ -89,9 +128,10 @@ const FIELDS = (hypervisor) => [
  */
 const SCHEMA = (hypervisor) => getObjectSchemaFromFields(FIELDS(hypervisor))
 
-export { SECTIONS, FIELDS, BOOT_ORDER_FIELD, SCHEMA }
 export * from './bootSchema'
+export * from './cpuModelSchema'
+export * from './featuresSchema'
 export * from './kernelSchema'
 export * from './ramdiskSchema'
-export * from './featuresSchema'
 export * from './rawSchema'
+export { BOOT_ORDER_FIELD, FIELDS, SCHEMA, SECTIONS }

@@ -18,7 +18,17 @@ import List from 'client/components/Tabs/Common/List'
 import Ownership from 'client/components/Tabs/Common/Ownership'
 import Permissions from 'client/components/Tabs/Common/Permissions'
 import RulesSecGroupsTable from 'client/components/Tabs/Common/RulesSecGroups'
+import RolesVmGroupsTable from 'client/components/Tabs/Common/Roles'
+import RolesAffinityVmGroupsTable from 'client/components/Tabs/Common/RolesAffinity'
 
 export * from 'client/components/Tabs/Common/Attribute'
 
-export { AttributePanel, List, Ownership, Permissions, RulesSecGroupsTable }
+export {
+  AttributePanel,
+  List,
+  Ownership,
+  Permissions,
+  RulesSecGroupsTable,
+  RolesVmGroupsTable,
+  RolesAffinityVmGroupsTable,
+}

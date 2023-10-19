@@ -20,6 +20,8 @@
 
 #include <sstream>
 
+#include <nlohmann/json.hpp>
+
 #include "ObjectXML.h"
 #include "HostPoolXML.h"
 #include "Resource.h"
@@ -129,6 +131,8 @@ public:
     //--------------------------------------------------------------------------
     int get_state() const { return state; };
 
+    std::string get_state_str() const;
+
     int get_lcm_state() const { return lcm_state; };
 
     int get_oid() const { return oid; };
@@ -154,6 +158,8 @@ public:
     bool is_only_public_cloud() const { return only_public_cloud; }
 
     void set_only_public_cloud() { only_public_cloud = true; }
+
+    void to_json(nlohmann::json &vm_json);
 
     //--------------------------------------------------------------------------
     // Scheduling requirements and rank
@@ -404,6 +410,11 @@ public:
         return vm_template.get();
     }
 
+    VirtualMachineTemplate * get_user_template()
+    {
+        return user_template.get();
+    }
+
     /**
      * Sets an attribute in the VM Template, it must be allocated in the heap
      *
@@ -422,6 +433,17 @@ public:
      *    @return 0 on success.
      */
     static int parse_action_name(std::string& action_st);
+
+    /**
+     *  Init list of attributes serialized to External Scheduler
+     *    @param attrs List of strings with format 'path:name', where
+     *          path could be
+     *              absolute '/VM/TEMPLATE/CPU'
+     *              relative '//CPU` - first attribute with name CPU
+     *          name - name of the attribute visible in External Scheduler
+     *          Examples '/VM/TEMPLATE/MEMORY:MEM', '//ROLE:VMGROUP_ROLE'
+     */
+    static void init_external_attrs(const std::vector<const SingleAttribute *>& attrs);
 
     //--------------------------------------------------------------------------
     // Logging
@@ -505,6 +527,8 @@ protected:
 
     std::unique_ptr<VirtualMachineTemplate> vm_template;   /**< The VM template */
     std::unique_ptr<VirtualMachineTemplate> user_template; /**< The VM user template */
+
+    static std::map<std::string, std::string> external_attributes;
 };
 
 #endif /* VM_XML_H_ */

@@ -2905,14 +2905,6 @@ void VirtualMachineUpdateNic::request_execute(
 
             return;
         }
-
-        if (nic->is_pci())
-        {
-            att.resp_msg = "Action not supported for PCI NIC";
-            failure_response(ACTION, att);
-
-            return;
-        }
     }
     else
     {
@@ -3654,7 +3646,7 @@ void VirtualMachineUpdateConf::request_execute(
     {
         string aname;
 
-        if ( vm->check_restricted(aname, uc_tmpl.get()) )
+        if ( vm->check_restricted(aname, uc_tmpl.get(), true) )
         {
             att.resp_msg = "Template includes a restricted attribute " + aname;
             failure_response(AUTHORIZATION, att);
@@ -3793,14 +3785,6 @@ void VirtualMachineDiskResize::request_execute(
         if ( size <= current_size )
         {
             att.resp_msg = "New disk size has to be greater than current one";
-            failure_response(ACTION, att);
-
-            return;
-        }
-
-        if ( disk->has_snapshots() )
-        {
-            att.resp_msg = "Cannot resize a disk with snapshots";
             failure_response(ACTION, att);
 
             return;
@@ -4050,6 +4034,27 @@ void VirtualMachineBackup::request_execute(
     if ( paramList.size() > 3 )
     {
         reset = xmlrpc_c::value_boolean(paramList.getBoolean(3));
+    }
+
+    if ( auto vm = pool->get_ro<VirtualMachine>(vm_id) )
+    {
+        int bj_id = vm->backups().backup_job_id();
+
+        if ( bj_id != -1)
+        {
+            att.resp_msg = "Unable to start an individual backup for the Virtual Machine"
+                ", it is part of Backup Job ID " + to_string(bj_id);
+
+            failure_response(INTERNAL, att);
+            return;
+        }
+    }
+    else
+    {
+        att.resp_id  = vm_id;
+
+        failure_response(NO_EXISTS, att);
+        return;
     }
 
     auto ec = request_execute(att, vm_id, backup_ds_id, reset);

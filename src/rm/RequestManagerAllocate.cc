@@ -265,22 +265,6 @@ void RequestManagerAllocate::request_execute(xmlrpc_c::paramList const& params,
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-static int drop_sched_actions(ScheduledActionPool *pool, std::vector<int> sa_ids)
-{
-    std::string error;
-    int i = 0;
-
-    for (const auto& id : sa_ids)
-    {
-        if (auto sa = pool->get(id))
-        {
-            pool->drop(sa.get(), error);
-            i++;
-        }
-    }
-
-    return i;
-}
 
 Request::ErrorCode VirtualMachineAllocate::pool_allocate(
         xmlrpc_c::paramList const&  paramList,
@@ -328,7 +312,7 @@ Request::ErrorCode VirtualMachineAllocate::pool_allocate(
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Create ScheduleAction and associate to the BackupJob                   */
+    /* Create ScheduleAction and associate to the VM                          */
     /* ---------------------------------------------------------------------- */
     for (const auto& sa : sas)
     {
@@ -348,13 +332,13 @@ Request::ErrorCode VirtualMachineAllocate::pool_allocate(
     /* ---------------------------------------------------------------------- */
     if (sa_error)
     {
-        drop_sched_actions(sapool, sa_ids);
+        sapool->drop_sched_actions(sa_ids);
 
         goto error_drop_vm;
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Associate SCHED_ACTIONS to the BackupJob                               */
+    /* Associate SCHED_ACTIONS to the VM                                      */
     /* ---------------------------------------------------------------------- */
     if ( auto vm = vmpool->get(id) )
     {
@@ -369,7 +353,7 @@ Request::ErrorCode VirtualMachineAllocate::pool_allocate(
     {
         att.resp_msg = "VM deleted while setting up SCHED_ACTION";
 
-        drop_sched_actions(sapool, sa_ids);
+        sapool->drop_sched_actions(sa_ids);
 
         return Request::INTERNAL;
     }
@@ -1466,6 +1450,21 @@ Request::ErrorCode BackupJobAllocate::pool_allocate(
 
     tmpl->remove("SCHED_ACTION", sas);
 
+    int priority;
+    if (tmpl->get("PRIORITY", priority))
+    {
+        if (priority < BackupJob::MIN_PRIO || priority > BackupJob::MAX_PRIO)
+        {
+            att.resp_msg = "Wrong priority value";
+            return Request::INTERNAL;
+        }
+
+        if (!att.is_admin() && priority > 50)
+        {
+            return Request::AUTHORIZATION;
+        }
+    }
+
     /* ---------------------------------------------------------------------- */
     /* Create BackupJob object                                                */
     /* ---------------------------------------------------------------------- */
@@ -1493,8 +1492,10 @@ Request::ErrorCode BackupJobAllocate::pool_allocate(
 
     bool sa_error = false;
 
-    for (const auto& sa : sas)
+    for (auto& sa : sas)
     {
+        sa->remove("ARGS");  // ARGS not used for Backup Job Scheduled Action
+
         int sa_id = sapool->allocate(PoolObjectSQL::BACKUPJOB, id, 0, sa.get(),
                 att.resp_msg);
 
@@ -1514,7 +1515,7 @@ Request::ErrorCode BackupJobAllocate::pool_allocate(
     /* ---------------------------------------------------------------------- */
     if (sa_error)
     {
-        drop_sched_actions(sapool, sa_ids);
+        sapool->drop_sched_actions(sa_ids);
 
         if ( auto bj = bjpool->get(id) )
         {
@@ -1541,7 +1542,7 @@ Request::ErrorCode BackupJobAllocate::pool_allocate(
     else
     {
         // BackupJob no longer exits, delete SchedActions
-        drop_sched_actions(sapool, sa_ids);
+        sapool->drop_sched_actions(sa_ids);
 
         att.resp_msg = "BACKUPJOB deleted while setting up SCHED_ACTION";
 

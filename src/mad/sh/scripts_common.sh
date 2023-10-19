@@ -45,7 +45,7 @@ RBD=${RBD:-rbd}
 READLINK=${READLINK:-readlink}
 RM=${RM:-rm}
 CP=${CP:-cp}
-SED=${SED:-sed}
+SED=${SED:-sed -r}
 SSH=${SSH:-ssh}
 SSH_FWD=${SSH_FWD:-ssh -o ForwardAgent=yes -o ControlMaster=no -o ControlPath=none}
 SUDO=${SUDO:-sudo -n}
@@ -58,12 +58,6 @@ TR=${TR:-tr}
 VGDISPLAY=${VGDISPLAY:-vgdisplay}
 VMKFSTOOLS=${VMKFSTOOLS:-vmkfstools}
 WGET=${WGET:-wget}
-
-if [ "x$(uname -s)" = "xLinux" ]; then
-    SED="$SED -r"
-else
-    SED="/usr/bin/sed -E"
-fi
 
 # Used for log messages
 SCRIPT_NAME=`basename -- $0`
@@ -919,8 +913,9 @@ function get_source_xml {
 # * SOURCE_ARGS: ex. protocol='rbd'
 # * SOURCE_HOST
 # * AUTH: auth xml for libvirt
+# * VIRTIO_SCSI_QUEUES
 #
-# This function was originaly in attach_disk action
+# This function was originally in attach_disk action
 
 function get_disk_information {
     FILTER="$1"
@@ -936,6 +931,7 @@ function get_disk_information {
     while IFS= read -r -d '' element; do
         XPATH_ELEMENTS[i++]="$element"
     done < <($CMD       /VMM_DRIVER_ACTION_DATA/VM/ID \
+                        /VMM_DRIVER_ACTION_DATA/VM/TEMPLATE/VCPU \
                         $DISK_XPATH/DRIVER \
                         $DISK_XPATH/TYPE \
                         $DISK_XPATH/READONLY \
@@ -979,9 +975,11 @@ function get_disk_information {
                         $DISK_XPATH/WRITE_IOPS_SEC_MAX \
                         $DISK_XPATH/WRITE_IOPS_SEC_MAX_LENGTH \
                         $DISK_XPATH/SIZE_IOPS_SEC \
+                        $DISK_XPATH/VIRTIO_BLK_QUEUES \
                         $DISK_XPATH/IOTHREAD )
 
     VMID="${XPATH_ELEMENTS[j++]}"
+    VCPU="${XPATH_ELEMENTS[j++]:-1}"
     DRIVER="${XPATH_ELEMENTS[j++]:-$DEFAULT_TYPE}"
     TYPE="${XPATH_ELEMENTS[j++]}"
     READONLY="${XPATH_ELEMENTS[j++]}"
@@ -1025,6 +1023,7 @@ function get_disk_information {
     WRITE_IOPS_SEC_MAX="${XPATH_ELEMENTS[j++]}"
     WRITE_IOPS_SEC_MAX_LENGTH="${XPATH_ELEMENTS[j++]}"
     SIZE_IOPS_SEC="${XPATH_ELEMENTS[j++]}"
+    VIRTIO_BLK_QUEUES="${XPATH_ELEMENTS[j++]}"
     IOTHREAD="${XPATH_ELEMENTS[j++]}"
 
     TYPE=$(echo "$TYPE"|tr A-Z a-z)
@@ -1116,19 +1115,15 @@ function get_disk_information {
                       </auth>"
             fi
             ;;
+        BLOCK)
+            TYPE_SOURCE="dev"
+            TYPE_XML="block"
+            DEVICE="disk"
+            ;;
         *)
-            case "$DISK_TM_MAD" in
-            fs_lvm)
-                TYPE_SOURCE="dev"
-                TYPE_XML="block"
-                DEVICE="disk"
-                ;;
-            *)
-                TYPE_SOURCE="file"
-                TYPE_XML="file"
-                DEVICE="disk"
-                ;;
-            esac
+            TYPE_SOURCE="file"
+            TYPE_XML="file"
+            DEVICE="disk"
             ;;
 
         esac

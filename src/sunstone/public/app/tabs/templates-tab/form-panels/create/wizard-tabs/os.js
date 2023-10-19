@@ -145,6 +145,9 @@ define(function(require) {
     return self.indexOf(value)===index;
   };
 
+  var VCPU = ''
+  var cache = {}
+
   /*
     CONSTRUCTOR
    */
@@ -199,11 +202,52 @@ define(function(require) {
   }
 
   function _onShow(context, panelForm) {
+    //fill Virtio Queues inputs
+    getValueVPU(context)
+  }
+
+  function getValueVPU(context, defaultValues){
+    var inputVcpu = $('#VCPU')
+
+    if(defaultValues){
+      cache = Object.assign({}, defaultValues)
+    }
+
+    fillInputsVirtioQueues(context, inputVcpu, defaultValues)
+  
+    inputVcpu.off("input").on("input", function(){
+      fillInputsVirtioQueues(context, inputVcpu, defaultValues)
+    })
+  }
+
+  function fillInputsVirtioQueues(context, vpu, defaultValues){
+    var value = parseInt(vpu.val(), 10) * 2 || 4
+    var scsi = $('[wizard_field="VIRTIO_SCSI_QUEUES"]', context)
+    var blk = $('[wizard_field="VIRTIO_BLK_QUEUES"]', context)
+    var defValueBlk = (defaultValues && defaultValues.VIRTIO_BLK_QUEUES) || (cache && cache.VIRTIO_BLK_QUEUES) || ""
+    var defValueScsi = (defaultValues && defaultValues.VIRTIO_SCSI_QUEUES) || (cache && cache.VIRTIO_SCSI_QUEUES) || ""
+    var optionEmpty = '<option value> - </option>'
+    var optionAuto = '<option value="auto">Auto</option>'
+    var restOptions = '';
+
+    for(var i = 1; i <= value; i++){
+      restOptions += '<option value="'+i+'">'+i+'</option>';
+    }
+
+    scsi.empty().append(optionEmpty+optionAuto+restOptions)
+    scsi.val(defValueScsi)
+
+    blk.empty().append(optionEmpty+optionAuto+restOptions)
+    blk.val(defValueBlk)
+
   }
 
   function _setup(context) {
     var that = this;
     Foundation.reflow(context, "tabs");
+
+    //fill Virtio Queues inputs
+    getValueVPU(context)
 
     context.on("click", "button.boot-order-up", function(){
       var tr = $(this).closest("tr");
@@ -295,7 +339,48 @@ define(function(require) {
     });
 
     fillMachineTypesAndCPUModel(context);
+    fillCPUFeatures(context);
+  }
 
+  function fillCPUFeatures (context, cpuModel){
+    OpenNebulaHost.list({
+      data : {},
+      timeout: true,
+      success: function (request, infoHosts){
+        var cpuFeatures = []
+        infoHosts.forEach((host)=> {
+          if(host && host.HOST && host.HOST.IM_MAD === 'kvm' && host.HOST.TEMPLATE && host.HOST.TEMPLATE.KVM_CPU_FEATURES){
+            var arrayFeatures = host.HOST.TEMPLATE.KVM_CPU_FEATURES.split(",")
+            for (var i = 0; i < arrayFeatures.length; i++) {
+              var currentValue = arrayFeatures[i];
+              if (cpuFeatures.indexOf(currentValue) === -1) {
+                cpuFeatures.push(currentValue);
+              }
+            }
+          }
+        })
+
+        var idSelector = 'feature-cpu'
+        var html = '<select id="'+idSelector+'" wizard_field="FEATURES" multiple>';
+        $.each(cpuFeatures, function(i, cpuFeature){
+          html += '<option value="' + cpuFeature + '">' + cpuFeature + '</option>';
+        });
+        html += '</select>';
+        var inputFeatures = $('#cpu-features', context)
+        inputFeatures.find("#"+idSelector).remove()
+        $('#cpu-features', context).append(html);
+        if (cpuModel && cpuModel.FEATURES){ 
+          var values = cpuModel.FEATURES.split(",")
+          $('#'+idSelector+' option').each(function(){
+            var option = $(this);
+            var value = option.val();
+            if ($.inArray(value, values) !== -1) {
+              option.prop("selected", true);
+          }
+          })
+        }
+      }
+    })
   }
 
   function fillMachineTypesAndCPUModel(context, cpuModel, machineType){
@@ -401,10 +486,11 @@ define(function(require) {
   }
 
   function _fill(context, templateJSON) {
+    var featuresJSON = templateJSON["FEATURES"];
     var osJSON = templateJSON["OS"];
     var modelJSON = templateJSON["CPU_MODEL"];
-    if (osJSON) {
 
+    if (osJSON) {
       if (osJSON["KERNEL_DS"] === undefined && osJSON["KERNEL"] !== undefined){
         $("input[value=\"kernel_path\"]", context).click();
       }
@@ -438,14 +524,16 @@ define(function(require) {
       }
     }
 
-    var featuresJSON = templateJSON["FEATURES"];
     if (featuresJSON) {
+      getValueVPU(context, featuresJSON);
       WizardFields.fill(context, featuresJSON);
+      
       delete templateJSON["FEATURES"];
     }
 
     fillMachineTypesAndCPUModel(context, modelJSON, osJSON);
-
+    fillCPUFeatures(context, modelJSON)
+    
     delete templateJSON["OS"];
     delete templateJSON["CPU_MODEL"];
   }

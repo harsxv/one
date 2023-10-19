@@ -22,8 +22,13 @@
 #include "NebulaUtil.h"
 #include "History.h"
 #include "RankScheduler.h"
+#include "VirtualMachine.h"
 
 using namespace std;
+
+using json = nlohmann::json;
+
+std::map<std::string, std::string> VirtualMachineXML::external_attributes;
 
 /******************************************************************************/
 /******************************************************************************/
@@ -218,7 +223,7 @@ void VirtualMachineXML::init_attributes()
 
     if (get_nodes("/VM/USER_TEMPLATE", nodes) > 0)
     {
-        user_template = make_unique<VirtualMachineTemplate>();
+        user_template = make_unique<VirtualMachineTemplate>(false,'=',"USER_TEMPLATE");
 
         user_template->from_xml_node(nodes[0]);
 
@@ -349,6 +354,8 @@ void VirtualMachineXML::init_storage_usage()
         delete disks[i];
     }
 }
+
+/* -------------------------------------------------------------------------- */
 
 /******************************************************************************/
 /******************************************************************************/
@@ -674,6 +681,127 @@ int VirtualMachineXML::parse_action_name(string& action_st)
 
     return 0;
 };
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+void VirtualMachineXML::init_external_attrs(const vector<const SingleAttribute *>& attrs)
+{
+    for (const auto &sa : attrs)
+    {
+        auto ext_atr = one_util::split(sa->value(), ':', true);
+
+        if (ext_atr.size() != 2)
+        {
+            ext_atr = one_util::split(sa->value(), '/', true);
+
+            if (ext_atr.empty())
+            {
+                NebulaLog::warn("SCHED", "Wrong format for external attribute: "
+                    + sa->value());
+                continue;
+            }
+
+            external_attributes.insert(make_pair(sa->value(), *ext_atr.rbegin()));
+        }
+        else
+        {
+            external_attributes.insert(make_pair(ext_atr[0], ext_atr[1]));
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+// We have to duplicate method from VirtualMachine.h, otherwise we get into linking hell
+static string state_to_str(VirtualMachine::VmState state)
+{
+    string st;
+
+    switch (state)
+    {
+        case VirtualMachine::INIT:
+            st = "INIT"; break;
+        case VirtualMachine::PENDING:
+            st = "PENDING"; break;
+        case VirtualMachine::HOLD:
+            st = "HOLD"; break;
+        case VirtualMachine::ACTIVE:
+            st = "ACTIVE"; break;
+        case VirtualMachine::STOPPED:
+            st = "STOPPED"; break;
+        case VirtualMachine::SUSPENDED:
+            st = "SUSPENDED"; break;
+        case VirtualMachine::DONE:
+            st = "DONE"; break;
+        case VirtualMachine::POWEROFF:
+            st = "POWEROFF"; break;
+        case VirtualMachine::UNDEPLOYED:
+            st = "UNDEPLOYED"; break;
+        case VirtualMachine::CLONING:
+            st = "CLONING"; break;
+        case VirtualMachine::CLONING_FAILURE:
+            st = "CLONING_FAILURE"; break;
+    }
+
+    return st;
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+void VirtualMachineXML::to_json(json &vm_json)
+{
+    vm_json["ID"]  = oid;
+    vm_json["STATE"] = state_to_str(static_cast<VirtualMachine::VmState>(state));
+
+    // -------------------------------------------------------------------------
+    // Add matching Hosts
+    // -------------------------------------------------------------------------
+    const vector<Resource *>& hosts = match_hosts.get_resources();
+
+    json hosts_json = json::array();
+
+    for (const auto& h : hosts)
+    {
+        hosts_json += h->oid;
+    }
+
+    vm_json["HOST_IDS"] = hosts_json;
+
+    // -------------------------------------------------------------------------
+    // Add requirements
+    // -------------------------------------------------------------------------
+    json req;
+
+    req["CPU"]      = cpu;
+    req["MEMORY"]    = memory * 1024;
+    req["DISK_SIZE"] = system_ds_usage;
+
+    vm_json["CAPACITY"] = req;
+
+    // -------------------------------------------------------------------------
+    // Add custom attributes
+    // -------------------------------------------------------------------------
+
+    map<string, string> custom_attributes;
+
+    for (const auto& attr : external_attributes)
+    {
+        string value;
+        xpath(value, attr.first.c_str(), "");
+
+        if (value.empty())
+        {
+            continue;
+        }
+
+        custom_attributes.insert(make_pair(attr.second, value));
+    }
+
+    vm_json["VM_ATTRIBUTES"] = custom_attributes;
+}
 
 //******************************************************************************
 // Updates to oned

@@ -39,6 +39,10 @@ const httpCodes = {
     id: 503,
     message: 'Service Unavailable',
   },
+  noContent: {
+    id: 204,
+    message: 'No content',
+  },
   accepted: {
     id: 202,
     message: 'Accepted',

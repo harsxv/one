@@ -15,10 +15,8 @@
  * ------------------------------------------------------------------------- */
 /* eslint-disable jsdoc/require-jsdoc */
 import PropTypes from 'prop-types'
-
 import { Group } from 'iconoir-react'
 import { Typography } from '@mui/material'
-
 import { rowStyles } from 'client/components/Tables/styles'
 
 const Row = ({ original, value, ...props }) => {

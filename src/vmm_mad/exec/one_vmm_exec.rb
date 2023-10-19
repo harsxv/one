@@ -817,18 +817,28 @@ class ExecDriver < VirtualMachineDriver
     def snapshot_revert(id, drv_message)
         xml_data = decode(drv_message)
 
-        host      = xml_data.elements['HOST'].text
-        deploy_id = xml_data.elements['DEPLOY_ID'].text
-
         snap_id_xpath = "VM/TEMPLATE/SNAPSHOT[ACTIVE='YES']/HYPERVISOR_ID"
         snapshot_name = xml_data.elements[snap_id_xpath].text
 
-        do_action("#{deploy_id} #{snapshot_name}",
-                  id,
-                  host,
-                  ACTION[:snapshot_revert],
-                  :script_name => 'snapshot_revert',
-                  :stdin => xml_data.to_s)
+        action = VmmAction.new(self, id, :snapshot_revert, drv_message)
+
+        steps = [
+            # Run the snapshot_revert action script
+            {
+                :driver       => :vmm,
+                :action       => :snapshot_revert,
+                :parameters   => [:deploy_id, snapshot_name]
+            },
+            # Execute post-boot networking setup
+            {
+                :driver       => :vnm,
+                :action       => :post,
+                :skip         => ['elastic'],
+                :parameters   => [:deploy_id, :host]
+            }
+        ]
+
+        action.run(steps)
     end
 
     #
@@ -1335,31 +1345,7 @@ class ExecDriver < VirtualMachineDriver
 
         vm_xml = xml_data.elements['/VMM_DRIVER_ACTION_DATA/VM']
 
-        # Backup operation steps
-        # TODO: failover steps
-        steps = [
-            # Generate backup files for VM disks
-            {
-                :driver     => :tm,
-                :action     => pre_name,
-                :parameters => pre_tm,
-                :stdin      => vm_xml
-            },
-            # Upload backup files to repo
-            {
-                :driver     => :ds,
-                :action     => :backup,
-                :parameters => ds_command,
-                :stdin      => xml_data.elements['DATASTORE'].to_s,
-                :fail_actions => [
-                    {
-                        :driver     => :tm,
-                        :action     => post_name,
-                        :parameters => post_tm,
-                        :stdin      => vm_xml
-                    }
-                ]
-            },
+        cleanup_steps = [
             # Cleanup backup and tmp files
             {
                 :driver     => :tm,
@@ -1368,6 +1354,27 @@ class ExecDriver < VirtualMachineDriver
                 :stdin      => vm_xml
             }
         ]
+
+        # Backup operation steps
+        # TODO: failover steps
+        steps = [
+            # Generate backup files for VM disks
+            {
+                :driver       => :tm,
+                :action       => pre_name,
+                :parameters   => pre_tm,
+                :stdin        => vm_xml,
+                :fail_actions => cleanup_steps
+            },
+            # Upload backup files to repo
+            {
+                :driver       => :ds,
+                :action       => :backup,
+                :parameters   => ds_command,
+                :stdin        => xml_data.elements['DATASTORE'].to_s,
+                :fail_actions => cleanup_steps
+            }
+        ] + cleanup_steps
 
         action.run(steps)
     end

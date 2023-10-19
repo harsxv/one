@@ -476,7 +476,10 @@ void VirtualNetwork::set_updated_attributes(Template* new_tmpl, bool removed)
         "INBOUND_PEAK_KB",
         "OUTBOUND_AVG_BW",
         "OUTBOUND_PEAK_BW",
-        "OUTBOUND_PEAK_KB"
+        "OUTBOUND_PEAK_KB",
+        //SRIOV
+        "SPOOFCHK",
+        "TRUST"
     };
 
     // Adds list of updated values to "VNET_UPDATE" attribute in the
@@ -1466,7 +1469,7 @@ int VirtualNetwork::replace_template(const std::string& tmpl_str,
     }
 
     if ( keep_restricted &&
-            new_tmpl->check_restricted(ra, obj_template.get()) )
+            new_tmpl->check_restricted(ra, obj_template.get(), false) )
     {
         error = "Tried to change restricted attribute: " + ra;
 
@@ -1518,7 +1521,7 @@ int VirtualNetwork::append_template(
     set_updated_attributes(new_tmpl.get(), false);
 
     if (keep_restricted &&
-        new_tmpl->check_restricted(rname, obj_template.get()))
+        new_tmpl->check_restricted(rname, obj_template.get(), true))
     {
         error ="User Template includes a restricted attribute " + rname;
         return -1;

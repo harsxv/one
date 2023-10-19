@@ -49,10 +49,15 @@ const commonTransformInitialValue = (scheduledAction, schema, typeForm) => {
     }
   }
 
-  return schema.cast(dataToCast, {
+  const castSchema = schema.cast(dataToCast, {
     context: scheduledAction,
     stripUnknown: true,
   })
+
+  // #6154: Add temportal id for restricted attributes
+  castSchema.TEMP_ID = scheduledAction.TEMP_ID
+
+  return castSchema
 }
 
 const commonTransformBeforeSubmit = (formData) => {
@@ -94,16 +99,16 @@ const commonTransformBeforeSubmit = (formData) => {
       scheduleAction.REPEAT = REPEAT
       switch (REPEAT) {
         case REPEAT_VALUES.WEEKLY:
-          scheduleAction.WEEKLY = WEEKLY
+          scheduleAction.DAYS = WEEKLY
           break
         case REPEAT_VALUES.MONTHLY:
-          scheduleAction.MONTHLY = MONTHLY
+          scheduleAction.DAYS = MONTHLY
           break
         case REPEAT_VALUES.YEARLY:
-          scheduleAction.YEARLY = YEARLY
+          scheduleAction.DAYS = YEARLY
           break
         default:
-          scheduleAction.HOURLY = HOURLY
+          scheduleAction.DAYS = HOURLY
           break
       }
     }

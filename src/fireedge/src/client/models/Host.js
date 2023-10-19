@@ -97,7 +97,8 @@ export const getAllocatedInfo = (host) => {
  * @returns {Array} List of hugepages sizes from resource
  */
 export const getHugepageSizes = (host) => {
-  const numaNodes = [host?.HOST_SHARE?.NUMA_NODES?.NODE ?? []].flat()
+  const wrapHost = Array.isArray(host) ? host : [host]
+  const numaNodes = [wrapHost?.HOST_SHARE?.NUMA_NODES?.NODE ?? []].flat()
 
   return numaNodes
     .filter((node) => node?.NODE_ID && node?.HUGEPAGE)
@@ -128,6 +129,23 @@ export const getKvmCpuModels = (hosts = []) => {
 
   // Removes the repeated
   return [...new Set(hostData)]
+}
+
+/**
+ * Returns list of KVM CPU Features available from the host pool.
+ *
+ * @param {Host[]} hosts - Hosts
+ * @returns {Array} List of KVM Machines from the pool
+ */
+export const getKvmCpuFeatures = (hosts = []) => {
+  const wrapHosts = Array.isArray(hosts) ? hosts : [hosts]
+  const machineTypes = wrapHosts
+    ?.filter((host) => host?.TEMPLATE?.HYPERVISOR === HYPERVISORS?.kvm)
+    ?.map((host) => host?.TEMPLATE?.KVM_CPU_FEATURES?.split(',') ?? [])
+    ?.flat()
+
+  // Removes the repeated
+  return [...new Set(machineTypes)]
 }
 
 /**
